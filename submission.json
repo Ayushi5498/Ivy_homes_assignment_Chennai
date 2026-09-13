@@ -8,7 +8,7 @@
     },
     "answers": {
         "total_listing_records": 4100,
-        "unique_properties": 0,
+        "unique_properties": 3980,
         "active_listings": 0,
         "corrupt_listing_ids": [],
         "total_monthly_rent": 0,
@@ -21,5 +21,17 @@
         "fake_listing_ids": [],
         "projects_with_wrong_listing_count": 0
     },
-    "findings": []
+    "findings": [
+        {
+            "endpoint": "/v1/listings",
+            "category": "data_quality",
+            "documented": "project_id links the listing to a builder project, and is null for resale property that is not part of one",
+            "actual": "listings sharing the same project_id are frequently in completely different buildings and locations. Example: project_id P40276 links listings from 4 different named buildings (Prestige Vista, SHRIRAM CREST, Rohan Park, Aparna Heights), 13-25 km apart despite all being tagged locality=velachery. The most extreme case found had linked listings 8,172 km apart. The project record for P40276 itself is named 'Brigade Meadows', which matches none of its 12 linked listings' apartment names.",
+            "how_found": "measured pairwise distances between listings sharing the same project_id, expecting them to be physically close since they claim to belong to the same builder project; found distances inconsistent with any real geographic grouping",
+            "impact": "project_id cannot be trusted to identify listings belonging to the same real building or project. This affects any analysis relying on project_id for grouping, including the reported total_listings count per project and identifying a project's actual price range",
+            "evidence": [
+                "P40276"
+            ]
+        }
+    ]
 }
