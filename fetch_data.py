@@ -94,12 +94,14 @@ def fetch_all(endpoint: str, headers: dict) -> list:
             print(f"  Page {page_num} returned no results; stopping.")
             break
 
+        # Collect this batch first, then decide whether to continue
         all_results.extend(results)
         print(f"  Fetched page {page_num} of {endpoint} "
               f"({len(all_results)}/{total} records)")
 
-        # Stop when the API says there's nothing more, or we've hit total
-        if not has_more or len(all_results) >= total:
+        # Stop only after collecting — has_more=False on the last real page
+        # means this was the final batch, so we're done
+        if not has_more:
             break
 
         offset   += len(results)   # advance by actual records returned, not PAGE_LIMIT
