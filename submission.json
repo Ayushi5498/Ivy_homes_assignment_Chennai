@@ -58,7 +58,7 @@
             "ZER-4002352"
         ],
         "total_monthly_rent": 0,
-        "avg_price_per_sqft_2bhk": 0.0,
+        "avg_price_per_sqft_2bhk": 9968.98,
         "costliest_project": {
             "project_id": "",
             "price_max_inr": 0
@@ -253,12 +253,11 @@
             "endpoint": "/v1/listings",
             "category": "data_quality",
             "documented": "Money: Indian rupees, integer, everywhere in the API",
-            "actual": "A small number of listings have price values implausibly low by a factor of ~100-1000x relative to their locality/size (e.g. ~9,430 for a full property where comparable listings are priced in the 90+ lakh range), suggesting a unit entry error (e.g. lakhs entered where full rupees were expected) rather than the documented rupee-integer convention being followed.",
-            "how_found": "computed price-per-sqft by locality+bedroom group and found a small cluster of listings at roughly 0.1% of the group median, distinct from the moderately-low (40-70%) band used for fake listing detection",
-            "impact": "these listings would display wildly incorrect prices if shown to a user without validation",
+            "actual": "8 listing records had price entered in thousands of rupees rather than full rupees (e.g. price=9430 for a property whose correct value is ₹94,30,000). Confirmed by multiplying by 1000: all 8 corrected prices fall in ₹72.4L–1.63Cr and produce price-per-sqft values (₹7,574–11,572) clustered tightly around the dataset median of ₹9,681/sqft. These records are corrected (price ×1000) and treated as valid listings, not excluded.",
+            "how_found": "computed price-per-sqft by locality+bedroom group and found a small cluster at roughly 0.1% of the group median; tested ×100 and ×1000 multipliers, confirmed ×1000 restores all 8 to realistic market-rate values",
+            "impact": "without correction these listings display prices ~1000x too low, making them appear impossibly cheap and skewing any price-based calculations or user-facing displays",
             "evidence": [
                 "DWE-4000745",
-                "MAG-4000075",
                 "MAG-4000870",
                 "MAG-4001467",
                 "MAG-4002092",
@@ -266,6 +265,21 @@
                 "ZER-4002683",
                 "100-4001484",
                 "100-4001961"
+            ]
+        },
+        {
+            "endpoint": "/v1/listings",
+            "category": "units",
+            "documented": "Area: Square feet, integer, everywhere in the API",
+            "actual": "326 listing records (predominantly sourced from magichomes) have both carpet_area and super_built_up_area reported in square metres instead of the documented square feet. Confirmed because their internal carpet/SBA ratio (~75%) exactly matches the normal ratio seen across all other portals, and converting both fields by 10.764 (sqm-to-sqft) produces realistic values (300-3,000 sqft, ₹3,000-20,000/sqft) consistent with the rest of the dataset.",
+            "how_found": "flagged as physically-impossible-tiny during Q6 outlier analysis; disproved via ratio comparison that it was a garbage/impossible value, then confirmed unit mismatch by successful correction",
+            "impact": "listings would display area values roughly 90% smaller than reality if not corrected, making legitimate properties look impossibly cramped and skewing any area or price-per-sqft based calculations",
+            "evidence": [
+                "MAG-4002264",
+                "MAG-4000126",
+                "MAG-4003464",
+                "MAG-4001884",
+                "MAG-4002993"
             ]
         }
     ]
