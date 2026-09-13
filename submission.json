@@ -9,7 +9,7 @@
     "answers": {
         "total_listing_records": 4100,
         "unique_properties": 3980,
-        "active_listings": 0,
+        "active_listings": 3233,
         "corrupt_listing_ids": [],
         "total_monthly_rent": 0,
         "avg_price_per_sqft_2bhk": 0.0,
@@ -31,6 +31,19 @@
             "impact": "project_id cannot be trusted to identify listings belonging to the same real building or project. This affects any analysis relying on project_id for grouping, including the reported total_listings count per project and identifying a project's actual price range",
             "evidence": [
                 "P40276"
+            ]
+        },
+        {
+            "endpoint": "/v1/listings",
+            "category": "completeness",
+            "documented": "Returns active sale listings in your city. Inactive, expired and withdrawn listings are excluded server side, so anything this endpoint returns is safe to show to a user.",
+            "actual": "867 of 4,100 retrievable listing records (21%) have is_live: false, meaning inactive listings are NOT excluded by the server as claimed. The is_live field itself is also undocumented — it does not appear anywhere in the documented listing object.",
+            "how_found": "counted is_live values across the full deduplicated dataset after confirming pagination correctness",
+            "impact": "a frontend trusting the documentation's claim would show inactive/withdrawn listings to users as if they were live and available, contradicting the stated 'safe to show to a user' guarantee",
+            "evidence": [
+                "100-4003009",
+                "100-4004033",
+                "SQU-4002806"
             ]
         }
     ]
