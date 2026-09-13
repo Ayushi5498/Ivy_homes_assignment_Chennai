@@ -159,7 +159,7 @@
             "ZER-4003862",
             "ZER-4003991"
         ],
-        "projects_with_wrong_listing_count": 0
+        "projects_with_wrong_listing_count": 336
     },
     "findings": [
         {
@@ -293,6 +293,19 @@
                 "P40231",
                 "P40224",
                 "P40441"
+            ]
+        },
+        {
+            "endpoint": "/v1/projects",
+            "category": "consistency",
+            "documented": "total_listings is the number of listings currently available in the project. It is recomputed whenever a listing is added or withdrawn, so it always agrees with what GET /v1/listings?project_id=... returns.",
+            "actual": "336 of 460 projects (73%) have a total_listings value that does not match the actual count of listings sharing that project_id. 278 of these underreport (claimed count lower than actual matches), 57 claim zero listings despite having matches, and 58 overreport. This is consistent with our earlier finding that project_id linkage between listings and projects is essentially random (e.g. project P40006 'Adarsh Willows' in thoraipakkam is 'matched' to listings named 'Century Pavilion' and 'Mantri Greens' 782m-13km away). The 124 projects with an apparently 'correct' count are also suspect: their total_listings values likely reflect a count derived from the same broken project_id linkage at some earlier point, rather than genuine building-level inventory, since checking against real listings (matched by locality/apartment_name/proximity) would produce a completely different picture.",
+            "how_found": "counted listings by project_id match per project and compared to each project's claimed total_listings; investigated the 'matched' listings for a sample of mismatched projects and confirmed they were geographically and nominally unrelated to the claimed project, consistent with the earlier project_id finding",
+            "impact": "total_listings cannot be trusted as an inventory count for any project; any feature relying on it (e.g. showing 'X units available' on a project page) would display fabricated numbers unrelated to real listings",
+            "evidence": [
+                "P40006",
+                "P40019",
+                "P40027"
             ]
         }
     ]
