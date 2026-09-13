@@ -57,11 +57,11 @@
             "ZER-4002305",
             "ZER-4002352"
         ],
-        "total_monthly_rent": 0,
+        "total_monthly_rent": 5948000,
         "avg_price_per_sqft_2bhk": 9968.98,
         "costliest_project": {
-            "project_id": "",
-            "price_max_inr": 0
+            "project_id": "P40224",
+            "price_max_inr": 37800000
         },
         "listings_last_7_days": 0,
         "fake_listing_ids": [
@@ -280,6 +280,19 @@
                 "MAG-4003464",
                 "MAG-4001884",
                 "MAG-4002993"
+            ]
+        },
+        {
+            "endpoint": "/v1/projects",
+            "category": "units",
+            "documented": "price_min and price_max are in rupees",
+            "actual": "price_max (and likely price_min) values follow an undocumented, inconsistent scale: 433 of 460 projects have values in the 1.01-3.99 range representing crores, while 27 projects have values in the 50-99.8 range representing lakhs. There are zero projects with values between 4 and 50, confirming a clean but undocumented bimodal unit split rather than a single consistent rupee-integer convention as documented. Without correcting for this, a project priced at 99.8 lakhs was misread as outranking projects actually priced above 3.5 crores.",
+            "how_found": "sanity-checked the top price_max result by comparing its implied price-per-sqft against the dataset and locality median; the implausibly cheap top result led to discovering the mixed-unit pattern. Confirmed with a full distribution analysis (zero ambiguous values in the 4-50 gap) and a reality check showing corrected top-10 projects' implied price-per-sqft aligns closely with local listing medians.",
+            "impact": "any client sorting, filtering, or ranking projects by price_max/price_min without correcting for this would produce wildly incorrect results, such as misidentifying the most or least expensive project",
+            "evidence": [
+                "P40231",
+                "P40224",
+                "P40441"
             ]
         }
     ]
