@@ -1,0 +1,74 @@
+.bar {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    padding: 1rem 1.25rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-shadow: 0 1px 6px rgba(45, 53, 97, 0.05);
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 130px;
+}
+
+.field label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--indigo);
+}
+
+.field select,
+.field input {
+    padding: 0.45rem 0.7rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    background: var(--sand);
+    color: var(--ink);
+    transition: border-color 0.15s;
+    font-family: inherit;
+}
+
+.field select:focus,
+.field input:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px rgba(26, 107, 114, 0.1);
+}
+
+.resetBtn {
+    align-self: flex-end;
+    padding: 0.45rem 0.9rem;
+    border: 1.5px solid var(--terracotta);
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--terracotta);
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.resetBtn:hover {
+    background: var(--terracotta);
+    color: var(--white);
+}
+
+.count {
+    font-size: 0.8rem;
+    color: var(--muted);
+}

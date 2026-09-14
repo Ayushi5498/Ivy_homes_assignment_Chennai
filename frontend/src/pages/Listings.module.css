@@ -1,0 +1,149 @@
+.page {
+    min-height: calc(100vh - 60px);
+    background: var(--sand);
+    padding: 2rem 1.5rem 4rem;
+}
+
+.inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* ── Header ── */
+.header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2rem;
+    color: var(--indigo);
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+/* ── Grid ── */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+}
+
+/* ── Skeleton cards ── */
+.skeleton {
+    height: 300px;
+    border-radius: 0.85rem;
+    background: linear-gradient(90deg, var(--sand-dark) 25%, var(--sand) 50%, var(--sand-dark) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ── Error ── */
+.error {
+    background: rgba(192, 57, 43, 0.08);
+    border: 1px solid rgba(192, 57, 43, 0.2);
+    border-radius: 0.6rem;
+    padding: 1rem 1.25rem;
+    color: var(--error);
+    font-size: 0.9rem;
+}
+
+/* ── Empty state ── */
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--muted);
+}
+
+.empty h3 {
+    font-size: 1.15rem;
+    color: var(--indigo);
+}
+
+.empty p {
+    font-size: 0.875rem;
+}
+
+/* ── Infinite scroll ── */
+.sentinel {
+    height: 1px;
+}
+
+.loadingMore {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--teal);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.filterSkeleton {
+    height: 90px;
+    border-radius: 0.85rem;
+    background: linear-gradient(90deg, var(--sand-dark) 25%, var(--sand) 50%, var(--sand-dark) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+
+.allLoaded {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding: 1rem;
+}
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+    .page {
+        padding: 1.25rem 1rem 3rem;
+    }
+
+    .title {
+        font-size: 1.5rem;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}

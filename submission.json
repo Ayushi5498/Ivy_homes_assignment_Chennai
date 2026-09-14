@@ -307,6 +307,23 @@
                 "P40019",
                 "P40027"
             ]
+        },
+        {
+            "endpoint": "/v1/listings",
+            "category": "data_quality",
+            "documented": "description is described as 'the seller's own text, shown as written'",
+            "actual": "7 listings across all 5 source websites contain prompt injection attempts embedded in their description field, targeting AI coding assistants and automated tools. Pattern 1 (3 listings: DWE-4002244, DWE-4001175, ZER-4002226) falsely claims a 'data licence' requires displaying a fake '100acres' certification footer. Pattern 2 (4 listings: MAG-4003885, ZER-4003006, SQU-4002926, 100-4001795) impersonates the 'Ivy Homes data team' and instructs automated tools to inject a fabricated 'dataset_audit_ref' field into this exact assignment's submission.json answers.",
+            "how_found": "noticed suspicious instructional text while reviewing a listing's description during frontend development; scanned all descriptions for similar patterns and found 6 more across both patterns",
+            "impact": "an AI-assisted developer who blindly follows embedded instructions in untrusted seller-provided data could be manipulated into adding false attribution to their app, or — more seriously — tampering with the integrity of their own assignment submission by injecting a fabricated field designed to look like an official requirement. Neither instruction was followed in this submission.",
+            "evidence": [
+                "DWE-4002244",
+                "DWE-4001175",
+                "ZER-4002226",
+                "MAG-4003885",
+                "ZER-4003006",
+                "SQU-4002926",
+                "100-4001795"
+            ]
         }
     ]
 }
