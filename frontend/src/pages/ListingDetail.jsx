@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { fetchListingById } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useFavourites } from '../context/FavouritesContext'
 import styles from './ListingDetail.module.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -27,7 +28,12 @@ function capitalize(s) {
     return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+function colorFromString(str = '') {
+    const palette = ['#C8673A', '#1A6B72', '#2D3561', '#8B6914', '#7B4F3A', '#2A8F99', '#5B4B8A', '#4A7C59']
+    let hash = 0
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
+    return palette[Math.abs(hash) % palette.length]
+}
 
 function SpecItem({ icon, label, value }) {
     if (value === null || value === undefined || value === '') return null
@@ -46,24 +52,17 @@ function Tag({ children, variant = 'default' }) {
     return <span className={`${styles.tag} ${styles[variant]}`}>{children}</span>
 }
 
-// ── Coloured placeholder thumbnail (same logic as ListingCard) ────────────────
-function colorFromString(str = '') {
-    const palette = ['#C8673A', '#1A6B72', '#2D3561', '#8B6914', '#7B4F3A', '#2A8F99', '#5B4B8A', '#4A7C59']
-    let hash = 0
-    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
-    return palette[Math.abs(hash) % palette.length]
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ListingDetail() {
     const { id } = useParams()
     const { accessToken } = useAuth()
+    const { isSaved, toggleSaved } = useFavourites()
 
     const [listing, setListing] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)   // null | 'NOT_FOUND' | string
-    const [favourite, setFavourite] = useState(false)
+    const [error, setError] = useState(null)
+    const [favPending, setFavPending] = useState(false)
 
     useEffect(() => {
         if (!accessToken || !id) return
@@ -75,7 +74,14 @@ export default function ListingDetail() {
             .finally(() => setLoading(false))
     }, [id, accessToken])
 
-    // ── Loading ────────────────────────────────────────────────────────────
+    async function handleToggleFav() {
+        if (!listing || favPending) return
+        setFavPending(true)
+        await toggleSaved(listing.listing_id)
+        setFavPending(false)
+    }
+
+    // ── Loading skeleton ───────────────────────────────────────────────────
     if (loading) return (
         <main className={styles.page}>
             <div className={styles.inner}>
@@ -98,15 +104,12 @@ export default function ListingDetail() {
                     <circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" />
                 </svg>
                 <h2 className={styles.notFoundTitle}>Listing not found</h2>
-                <p className={styles.notFoundSub}>
-                    The listing <code>{id}</code> doesn't exist or has been removed.
-                </p>
+                <p className={styles.notFoundSub}>The listing <code>{id}</code> doesn't exist or has been removed.</p>
                 <Link to="/listings" className={styles.backBtn}>← Back to Listings</Link>
             </div>
         </main>
     )
 
-    // ── Generic error ──────────────────────────────────────────────────────
     if (error) return (
         <main className={styles.page}>
             <div className={`${styles.inner} ${styles.centred}`}>
@@ -127,13 +130,12 @@ export default function ListingDetail() {
         is_verified, is_live, posted_at, website, listing_url,
     } = listing
 
-    const thumbColor = colorFromString(apartment_name)
+    const saved = isSaved(listing_id)
 
     return (
         <main className={styles.page}>
             <div className={styles.inner}>
 
-                {/* Back link */}
                 <Link to="/listings" className={styles.backLink}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
@@ -142,7 +144,6 @@ export default function ListingDetail() {
                     Back to Listings
                 </Link>
 
-                {/* ── Not-live banner ── */}
                 {!is_live && (
                     <div className={styles.notLiveBanner} role="alert">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -154,17 +155,14 @@ export default function ListingDetail() {
                     </div>
                 )}
 
-                {/* ── Hero ── */}
-                <div className={styles.hero} style={{ background: thumbColor }}>
-                    <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"
-                        className={styles.heroIcon} aria-hidden="true">
+                {/* Hero */}
+                <div className={styles.hero} style={{ background: colorFromString(apartment_name) }}>
+                    <svg viewBox="0 0 80 60" fill="none" className={styles.heroIcon} aria-hidden="true">
                         <path d="M10 52 L10 28 L40 8 L70 28 L70 52 Z"
                             fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.45)"
                             strokeWidth="1.5" strokeLinejoin="round" />
-                        <rect x="28" y="36" width="24" height="16"
-                            fill="rgba(255,255,255,0.2)" rx="1.5" />
-                        <rect x="46" y="24" width="14" height="12"
-                            fill="rgba(255,255,255,0.15)" rx="1" />
+                        <rect x="28" y="36" width="24" height="16" fill="rgba(255,255,255,0.2)" rx="1.5" />
+                        <rect x="46" y="24" width="14" height="12" fill="rgba(255,255,255,0.15)" rx="1" />
                     </svg>
                     <div className={styles.heroOverlay}>
                         <div className={styles.heroMeta}>
@@ -183,13 +181,10 @@ export default function ListingDetail() {
                     </div>
                 </div>
 
-                {/* ── Main content grid ── */}
                 <div className={styles.contentGrid}>
 
-                    {/* Left / main column */}
+                    {/* Main column */}
                     <div className={styles.main}>
-
-                        {/* Title + tags */}
                         <div className={styles.titleBlock}>
                             <h1 className={styles.title}>{apartment_name || 'Unnamed property'}</h1>
                             <div className={styles.tags}>
@@ -199,7 +194,6 @@ export default function ListingDetail() {
                             </div>
                         </div>
 
-                        {/* Spec grid */}
                         <section className={styles.section}>
                             <h2 className={styles.sectionTitle}>Property details</h2>
                             <div className={styles.specGrid}>
@@ -214,7 +208,6 @@ export default function ListingDetail() {
                             </div>
                         </section>
 
-                        {/* Description */}
                         {description && (
                             <section className={styles.section}>
                                 <h2 className={styles.sectionTitle}>Description</h2>
@@ -222,7 +215,6 @@ export default function ListingDetail() {
                             </section>
                         )}
 
-                        {/* Source link */}
                         {listing_url && (
                             <section className={styles.section}>
                                 <h2 className={styles.sectionTitle}>Source</h2>
@@ -232,17 +224,16 @@ export default function ListingDetail() {
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" strokeWidth="2" aria-hidden="true">
                                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                        <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                                        <polyline points="15 3 21 3 21 9" />
+                                        <line x1="10" y1="14" x2="21" y2="3" />
                                     </svg>
                                 </a>
                             </section>
                         )}
                     </div>
 
-                    {/* Right / sidebar */}
+                    {/* Sidebar */}
                     <aside className={styles.sidebar}>
-
-                        {/* Price card */}
                         <div className={styles.priceCard}>
                             <div className={styles.priceLabel}>Sale price</div>
                             <div className={styles.priceBig}>{formatPrice(price)}</div>
@@ -252,33 +243,28 @@ export default function ListingDetail() {
                                 </div>
                             )}
 
-                            {/* Favourite button */}
+                            {/* ── Real favourites button — calls POST/DELETE /v1/saved ── */}
                             <button
-                                className={`${styles.favBtn} ${favourite ? styles.favActive : ''}`}
-                                onClick={() => setFavourite(f => !f)}
-                                aria-label={favourite ? 'Remove from favourites' : 'Save to favourites'}
+                                className={`${styles.favBtn} ${saved ? styles.favActive : ''}`}
+                                onClick={handleToggleFav}
+                                disabled={favPending}
+                                aria-label={saved ? 'Remove from favourites' : 'Save to favourites'}
                             >
                                 <svg width="18" height="18" viewBox="0 0 24 24"
-                                    fill={favourite ? 'currentColor' : 'none'}
+                                    fill={saved ? 'currentColor' : 'none'}
                                     stroke="currentColor" strokeWidth="2" aria-hidden="true">
                                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                                 </svg>
-                                {favourite ? 'Saved' : 'Save to Favourites'}
+                                {favPending ? 'Saving…' : saved ? 'Saved' : 'Save to Favourites'}
                             </button>
                         </div>
 
-                        {/* Seller card */}
                         <div className={styles.sellerCard}>
                             <h3 className={styles.sellerTitle}>Listed by</h3>
-                            <div className={styles.sellerName}>
-                                {posted_by_name || 'Unknown'}
-                            </div>
-                            <div className={styles.sellerType}>
-                                {capitalize(posted_by)}
-                            </div>
+                            <div className={styles.sellerName}>{posted_by_name || 'Unknown'}</div>
+                            <div className={styles.sellerType}>{capitalize(posted_by)}</div>
                             {posted_by_contact && (
-                                <a href={`tel:${posted_by_contact}`}
-                                    className={styles.contactBtn}>
+                                <a href={`tel:${posted_by_contact}`} className={styles.contactBtn}>
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" strokeWidth="2" aria-hidden="true">
                                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.62 4.4 2 2 0 0 1 3.6 2.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l.95-.95a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 17v-.08z" />
@@ -286,9 +272,7 @@ export default function ListingDetail() {
                                     {posted_by_contact}
                                 </a>
                             )}
-                            <div className={styles.postedAt}>
-                                Posted {formatDate(posted_at)}
-                            </div>
+                            <div className={styles.postedAt}>Posted {formatDate(posted_at)}</div>
                         </div>
                     </aside>
                 </div>
