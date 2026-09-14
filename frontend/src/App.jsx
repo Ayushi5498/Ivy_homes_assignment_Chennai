@@ -8,6 +8,7 @@ import ListingDetail from './pages/ListingDetail'
 import Rentals from './pages/Rentals'
 import Projects from './pages/Projects'
 import Favourites from './pages/Favourites'
+import Insights from './pages/Insights'
 import PlaceholderPage from './pages/PlaceholderPage'
 
 function AuthLayout() {
@@ -21,7 +22,7 @@ function AuthLayout() {
                 <Route path="rentals" element={<Rentals />} />
                 <Route path="projects" element={<Projects />} />
                 <Route path="favourites" element={<Favourites />} />
-                <Route path="insights" element={<PlaceholderPage title="Insights" />} />
+                <Route path="insights" element={<Insights />} />
                 <Route path="*" element={<Navigate to="/listings" replace />} />
             </Routes>
         </>
