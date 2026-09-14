@@ -1,89 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { authHeaders } from '../api/client'
+import { useMemo } from 'react'
 import styles from './Insights.module.css'
-
-const BASE_URL = 'https://solve.ivy.homes'
-const TRUE_COUNT = 4100   // our verified total
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n) { return n != null ? n.toLocaleString('en-IN') : '—' }
-
-function fmtPrice(p) {
-    if (!p) return '—'
-    if (p >= 1_00_00_000) return `₹${(p / 1_00_00_000).toFixed(2)} Cr`
-    if (p >= 1_00_000) return `₹${(p / 1_00_000).toFixed(1)}L`
-    return `₹${p.toLocaleString('en-IN')}`
-}
-
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s }
 
-// ── Static data quality notes from submission.json ────────────────────────────
-// (numbers hardcoded from our verified analysis — not from the unreliable API)
-
-const QUALITY_NOTES = [
-    {
-        icon: '🚫',
-        title: '21% of listings are inactive',
-        detail: '867 of the 4,100 retrieved listings have is_live: false — meaning they are expired, sold, or withdrawn. The API documentation claims these are excluded server-side, but they are not. This site filters them out before showing you results.',
-        tag: 'Completeness',
-        tagColor: '#CCE5FF',
-        tagText: '#004085',
-    },
-    {
-        icon: '📐',
-        title: '3,980 distinct properties (not 4,100)',
-        detail: '120 listings appear to describe the same physical property listed multiple times across different portals (squarelane, magichomes, dwelling, etc.). We identify duplicates by matching coordinates within 30m + same floor + same bedroom count + same locality.',
-        tag: 'Deduplication',
-        tagColor: '#D4EDDA',
-        tagText: '#276221',
-    },
-    {
-        icon: '⚠️',
-        title: '45 listings have physically impossible data',
-        detail: 'We found listings where the floor number exceeds the building\'s total floors, carpet area is larger than super built-up area, prices are negative, latitude and longitude are swapped, or posting dates are in the future. All 45 are excluded from price calculations.',
-        tag: 'Data quality',
-        tagColor: '#F8D7DA',
-        tagText: '#721C24',
-    },
-    {
-        icon: '🔍',
-        title: '93 listings show patterns consistent with fake ads',
-        detail: 'These listings share a phone number that appears on 15+ other unrelated properties (scattered across different builders, localities, and property types — inconsistent with a real agent\'s portfolio), AND are priced 40–70% below the local market rate — a "too good to be true" signal without being an obvious data error.',
-        tag: 'Fraud signals',
-        tagColor: '#FFF3CD',
-        tagText: '#856404',
-    },
-    {
-        icon: '📏',
-        title: '326 listings report area in sqm, not sqft',
-        detail: 'A batch of listings (predominantly from one source portal) stores carpet_area and super_built_up_area in square metres instead of the documented square feet. A 2BHK showing 84 sqft is actually 904 sqft (84 × 10.764). We correct these automatically when displaying area and price-per-sqft.',
-        tag: 'Units',
-        tagColor: '#E2D9F3',
-        tagText: '#40217A',
-    },
-    {
-        icon: '🔗',
-        title: 'Project IDs don\'t reliably link listings to projects',
-        detail: 'Listings sharing the same project_id are often in completely different buildings, kilometres apart. Example: project P40276 links listings from four unrelated buildings (Prestige Vista, SHRIRAM CREST, Rohan Park, Aparna Heights) spread 13–25 km across Chennai. The project record itself is named "Brigade Meadows" and matches none of them.',
-        tag: 'Data quality',
-        tagColor: '#F8D7DA',
-        tagText: '#721C24',
-    },
-    {
-        icon: '🛡️',
-        title: '7 listings contain prompt injection attempts',
-        detail: 'Seven listing descriptions include hidden instructions targeting AI coding tools — one pattern falsely claims a "data licence" requires adding a fake attribution badge, another impersonates the Ivy Homes data team to manipulate assignment submissions. Neither instruction was followed.',
-        tag: 'Security',
-        tagColor: '#F5ECD7',
-        tagText: '#6B4D2A',
-    },
-]
-
-// ── Locality price data (precomputed from our cleaned analysis) ───────────────
-// Source: calc_q6_final.py — is_live=true, excludes 45 corrupt + 93 fake,
-//         corrects 326 sqm-area records, corrects 8 price-unit records.
+// ── Static data — from our verified analysis of the full dataset ──────────────
 
 const LOCALITY_PRICE_DATA = [
     { locality: 'adyar', ppsf: 10260, count: 298 },
@@ -98,195 +21,167 @@ const LOCALITY_PRICE_DATA = [
     { locality: 'velachery', ppsf: 10208, count: 289 },
 ]
 
-const MAX_PPSF = Math.max(...LOCALITY_PRICE_DATA.map(d => d.ppsf))
+// BHK distribution computed from our clean listings
+const BHK_DATA = [
+    { bhk: 1, count: 412 },
+    { bhk: 2, count: 1049 },
+    { bhk: 3, count: 1187 },
+    { bhk: 4, count: 443 },
+    { bhk: 5, count: 142 },
+]
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+const QUALITY_NOTES = [
+    {
+        icon: '🚫',
+        title: '21% of listings are inactive',
+        detail: '867 of the 4,100 retrieved listings have is_live: false — expired, sold, or withdrawn. The API docs claim these are excluded server-side, but they are not. This site filters them out automatically.',
+        tag: 'Completeness', tagColor: '#CCE5FF', tagText: '#004085',
+    },
+    {
+        icon: '📐',
+        title: '3,980 distinct properties (not 4,100)',
+        detail: '120 listings describe the same physical property listed across multiple portals. We identify duplicates by matching coordinates within 30m + same floor + same bedroom count + same locality.',
+        tag: 'Deduplication', tagColor: '#D4EDDA', tagText: '#276221',
+    },
+    {
+        icon: '⚠️',
+        title: '45 listings have impossible data',
+        detail: 'Floor exceeds total floors, carpet area larger than super built-up area, negative prices, swapped lat/lon coordinates, or future posting dates. All 45 are excluded from calculations.',
+        tag: 'Data quality', tagColor: '#F8D7DA', tagText: '#721C24',
+    },
+    {
+        icon: '🔍',
+        title: '93 listings show fake ad patterns',
+        detail: 'A contact number shared across 15+ unrelated properties AND a price 40–70% below the local market median. Consistent with enquiry-bait listings, not genuine offers.',
+        tag: 'Fraud signals', tagColor: '#FFF3CD', tagText: '#856404',
+    },
+    {
+        icon: '📏',
+        title: '326 listings report area in sqm not sqft',
+        detail: 'One source portal stores carpet and built-up area in square metres. A 2BHK showing 84 sqft is actually 904 sqft (84 × 10.764). We correct these when displaying area and ₹/sqft.',
+        tag: 'Units', tagColor: '#E2D9F3', tagText: '#40217A',
+    },
+    {
+        icon: '🔗',
+        title: 'Project IDs don\'t link listings to projects reliably',
+        detail: 'Listings sharing a project_id are often kilometres apart in unrelated buildings. Project P40276 links four different named buildings spread 13–25 km across Chennai — its own record is named "Brigade Meadows", matching none of them.',
+        tag: 'Data quality', tagColor: '#F8D7DA', tagText: '#721C24',
+    },
+    {
+        icon: '💰',
+        title: 'Project prices use inconsistent units',
+        detail: '433 projects store price in crores (values 1–4), 27 store in lakhs (values 50–100). There are zero projects with values between 4–50, confirming a hidden bimodal unit split. Without correction, a ₹99.8L project appeared more expensive than ₹3.78Cr ones.',
+        tag: 'Units', tagColor: '#E2D9F3', tagText: '#40217A',
+    },
+    {
+        icon: '🛡️',
+        title: '7 listings contain prompt injection attempts',
+        detail: 'Descriptions include hidden instructions targeting AI coding tools — one falsely claims a "data licence" requires adding a fake attribution badge; another impersonates Ivy Homes to tamper with assignment submissions. Neither instruction was followed.',
+        tag: 'Security', tagColor: '#F5ECD7', tagText: '#6B4D2A',
+    },
+    {
+        icon: '📊',
+        title: 'API pagination undercounts the dataset',
+        detail: 'The "total" field reports 3,836 listings but has_more stays true past it. Fetching to the real end yields 4,100 records — 264 more than reported. Stop condition must use empty results, not the total field.',
+        tag: 'API bug', tagColor: '#F8D7DA', tagText: '#721C24',
+    },
+]
 
-function StatCard({ label, value, sub, warn }) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, note }) {
     return (
         <div className={styles.statCard}>
             <div className={styles.statValue}>{value}</div>
             <div className={styles.statLabel}>{label}</div>
             {sub && <div className={styles.statSub}>{sub}</div>}
-            {warn && <div className={styles.statWarn}>{warn}</div>}
+            {note && <div className={styles.statNote}>{note}</div>}
         </div>
     )
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Insights() {
-    const { accessToken } = useAuth()
-    const [summary, setSummary] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [apiError, setApiError] = useState(null)
-
-    useEffect(() => {
-        if (!accessToken) return
-        fetch(`${BASE_URL}/v1/analytics/summary`, { headers: authHeaders(accessToken) })
-            .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-            .then(data => setSummary(data))
-            .catch(e => setApiError(String(e)))
-            .finally(() => setLoading(false))
-    }, [accessToken])
-
-    const apiTotal = summary?.total_listings
-
-    // Sort localities by ppsf descending for the bar chart
-    const sortedLocalities = useMemo(() =>
-        [...LOCALITY_PRICE_DATA].sort((a, b) => b.ppsf - a.ppsf)
-        , [])
-
-    // Sort API by_locality by count descending
-    const byLocality = useMemo(() => {
-        if (!summary?.by_locality) return []
-        return [...summary.by_locality].sort((a, b) => b.count - a.count)
-    }, [summary])
-
-    const byBhk = useMemo(() => {
-        if (!summary?.by_bhk) return []
-        return [...summary.by_bhk].sort((a, b) => a.bhk - b.bhk)
-    }, [summary])
-
-    const maxBhkCount = Math.max(...byBhk.map(d => d.count), 1)
+    const maxPpsf = Math.max(...LOCALITY_PRICE_DATA.map(d => d.ppsf))
+    const maxBhk = Math.max(...BHK_DATA.map(d => d.count))
+    const sortedLoc = useMemo(() => [...LOCALITY_PRICE_DATA].sort((a, b) => b.ppsf - a.ppsf), [])
+    const totalClean = LOCALITY_PRICE_DATA.reduce((s, d) => s + d.count, 0)
 
     return (
         <main className={styles.page}>
             <div className={styles.inner}>
 
-                {/* ── Page header ── */}
+                {/* Page header */}
                 <div className={styles.pageHeader}>
                     <h1 className={styles.pageTitle}>Insights</h1>
                     <p className={styles.pageSubtitle}>
-                        Official analytics from the API, plus our own data quality discoveries from
-                        a thorough investigation of the full Chennai dataset.
+                        Key figures from our full investigation of Chennai's 4,100-record dataset,
+                        plus 9 documented data quality findings.
                     </p>
                 </div>
 
-                {/* ══════════════════════════════════════════════════════
-                    SECTION 1 — Official API analytics
-                ══════════════════════════════════════════════════════ */}
+                {/* Section 1 — Dataset overview */}
                 <section className={styles.section}>
                     <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>Official API Analytics</h2>
-                        <span className={styles.sectionBadge}>From GET /v1/analytics/summary</span>
+                        <h2 className={styles.sectionTitle}>Dataset Overview</h2>
+                        <span className={styles.sectionBadge}>Our verified figures</span>
+                    </div>
+                    <p className={styles.chartNote}>
+                        The API's <code>/v1/analytics/summary</code> endpoint is unavailable in this environment (404).
+                        All figures below are from our own analysis of the complete dataset.
+                    </p>
+
+                    <div className={styles.statsGrid}>
+                        <StatCard label="Total listing records" value="4,100"
+                            sub="retrieved via correct offset pagination"
+                            note="API's own 'total' field reports 3,836 — undercounts by 264" />
+                        <StatCard label="Active listings" value="3,233" sub="is_live = true (79% of total)" />
+                        <StatCard label="Distinct properties" value="3,980" sub="after deduplicating cross-portal duplicates" />
+                        <StatCard label="Avg ₹/sqft — 2BHK" value="₹9,969" sub="clean data, unit errors corrected" />
+                        <StatCard label="Listings last 7 days" value="122" sub="posted 3–10 Sep 2026 (IST)" />
+                        <StatCard label="OMR total monthly rent" value="₹59.5L" sub="sum across 171 OMR rental records" />
                     </div>
 
-                    {loading && (
-                        <div className={styles.skeletonRow}>
-                            {[1, 2, 3, 4].map(i => <div key={i} className={styles.skeleton} />)}
-                        </div>
-                    )}
-
-                    {apiError && (
-                        <div className={styles.errorBox}>
-                            Could not load analytics: {apiError}
-                        </div>
-                    )}
-
-                    {summary && (
-                        <>
-                            {/* Stat cards */}
-                            <div className={styles.statsGrid}>
-                                <StatCard
-                                    label="City"
-                                    value={cap(summary.city) || 'Chennai'}
-                                />
-                                <StatCard
-                                    label="Total listings (API)"
-                                    value={fmt(apiTotal)}
-                                    warn={apiTotal !== TRUE_COUNT
-                                        ? `Note: our verified count is ${fmt(TRUE_COUNT)} — the API undercounts due to a known pagination bug (has_more stays true past the reported total)`
-                                        : null}
-                                />
-                                <StatCard
-                                    label="Median price"
-                                    value={fmtPrice(summary.median_price)}
-                                    sub="across all sale listings"
-                                />
-                                <StatCard
-                                    label="Median ₹/sqft"
-                                    value={summary.median_price_per_sqft
-                                        ? `₹${Math.round(summary.median_price_per_sqft).toLocaleString('en-IN')}`
-                                        : '—'}
-                                    sub="price per sq ft"
-                                />
-                            </div>
-
-                            {/* By BHK */}
-                            {byBhk.length > 0 && (
-                                <div className={styles.chartBlock}>
-                                    <h3 className={styles.chartTitle}>Listings by bedroom count (API)</h3>
-                                    <div className={styles.bhkBars}>
-                                        {byBhk.map(d => (
-                                            <div key={d.bhk} className={styles.bhkRow}>
-                                                <span className={styles.bhkLabel}>{d.bhk} BHK</span>
-                                                <div className={styles.bhkBarWrap}>
-                                                    <div className={styles.bhkBar}
-                                                        style={{ width: `${(d.count / maxBhkCount) * 100}%` }} />
-                                                </div>
-                                                <span className={styles.bhkCount}>{fmt(d.count)}</span>
-                                            </div>
-                                        ))}
+                    {/* BHK distribution */}
+                    <div className={styles.chartBlock}>
+                        <h3 className={styles.chartTitle}>Active listings by bedroom count</h3>
+                        <div className={styles.bhkBars}>
+                            {BHK_DATA.map(d => (
+                                <div key={d.bhk} className={styles.bhkRow}>
+                                    <span className={styles.bhkLabel}>{d.bhk} BHK</span>
+                                    <div className={styles.bhkBarWrap}>
+                                        <div className={styles.bhkBar}
+                                            style={{ width: `${(d.count / maxBhk) * 100}%` }} />
                                     </div>
+                                    <span className={styles.bhkCount}>{fmt(d.count)}</span>
                                 </div>
-                            )}
-
-                            {/* By locality table */}
-                            {byLocality.length > 0 && (
-                                <div className={styles.chartBlock}>
-                                    <h3 className={styles.chartTitle}>Listings by locality (API)</h3>
-                                    <div className={styles.tableWrap}>
-                                        <table className={styles.table}>
-                                            <thead>
-                                                <tr>
-                                                    <th>Locality</th>
-                                                    <th className={styles.right}>Listings</th>
-                                                    <th className={styles.right}>Median price</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {byLocality.map(d => (
-                                                    <tr key={d.locality}>
-                                                        <td>{cap(d.locality)}</td>
-                                                        <td className={styles.right}>{fmt(d.count)}</td>
-                                                        <td className={styles.right}>{fmtPrice(d.median_price)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
+                            ))}
+                        </div>
+                    </div>
                 </section>
 
-                {/* ══════════════════════════════════════════════════════
-                    SECTION 2 — Our locality price comparison
-                ══════════════════════════════════════════════════════ */}
+                {/* Section 2 — Locality price comparison */}
                 <section className={styles.section}>
                     <div className={styles.sectionHeader}>
                         <h2 className={styles.sectionTitle}>Price-per-sqft by Locality</h2>
-                        <span className={styles.sectionBadge} style={{ background: 'rgba(26,107,114,0.1)', color: 'var(--teal)' }}>
+                        <span className={styles.sectionBadge}
+                            style={{ background: 'rgba(26,107,114,0.1)', color: 'var(--teal)' }}>
                             Our verified data · excludes corrupt &amp; fake listings
                         </span>
                     </div>
                     <p className={styles.chartNote}>
-                        Calculated from {fmt(LOCALITY_PRICE_DATA.reduce((s, d) => s + d.count, 0))} live,
-                        clean listings — after excluding 45 corrupt records, 93 fake listings,
-                        and correcting unit errors in 334 records.
+                        Calculated from {fmt(totalClean)} live, clean listings — after excluding 45 corrupt records,
+                        93 fake listings, and correcting unit errors in 334 records.
                     </p>
 
                     <div className={styles.localityBars}>
-                        {sortedLocalities.map(d => (
+                        {sortedLoc.map(d => (
                             <div key={d.locality} className={styles.localityRow}>
                                 <span className={styles.localityLabel}>{cap(d.locality)}</span>
                                 <div className={styles.localityBarWrap}>
-                                    <div
-                                        className={styles.localityBar}
-                                        style={{ width: `${(d.ppsf / MAX_PPSF) * 100}%` }}
-                                    />
+                                    <div className={styles.localityBar}
+                                        style={{ width: `${(d.ppsf / maxPpsf) * 100}%` }} />
                                     <span className={styles.localityPpsf}>
                                         ₹{d.ppsf.toLocaleString('en-IN')}/sqft
                                     </span>
@@ -297,41 +192,24 @@ export default function Insights() {
                     </div>
 
                     <div className={styles.ourStatGrid}>
-                        <StatCard
-                            label="Avg ₹/sqft for 2BHK"
-                            value="₹9,969"
-                            sub="is_live=true, clean data, corrected units"
-                        />
-                        <StatCard
-                            label="Most expensive locality"
-                            value="T Nagar"
-                            sub="₹10,690/sqft median"
-                        />
-                        <StatCard
-                            label="Most affordable locality"
-                            value="Tambaram"
-                            sub="₹9,412/sqft median"
-                        />
-                        <StatCard
-                            label="Price spread"
-                            value="14%"
-                            sub="difference between cheapest and priciest locality"
-                        />
+                        <StatCard label="Most expensive" value="T Nagar" sub="₹10,690/sqft median" />
+                        <StatCard label="Most affordable" value="Tambaram" sub="₹9,412/sqft median" />
+                        <StatCard label="Price spread" value="14%" sub="cheapest to priciest locality" />
+                        <StatCard label="Costliest project" value="P40224" sub="Shriram Serenity, T Nagar · ₹3.78 Cr max" />
                     </div>
                 </section>
 
-                {/* ══════════════════════════════════════════════════════
-                    SECTION 3 — Data quality notes
-                ══════════════════════════════════════════════════════ */}
+                {/* Section 3 — Data quality findings */}
                 <section className={styles.section}>
                     <div className={styles.sectionHeader}>
                         <h2 className={styles.sectionTitle}>Data Quality Notes</h2>
-                        <span className={styles.sectionBadge} style={{ background: 'rgba(192,57,43,0.08)', color: 'var(--error)' }}>
+                        <span className={styles.sectionBadge}
+                            style={{ background: 'rgba(192,57,43,0.08)', color: 'var(--error)' }}>
                             9 findings documented
                         </span>
                     </div>
                     <p className={styles.chartNote}>
-                        These are real issues we found by investigating the full dataset of 4,100 records.
+                        Real issues found by investigating all 4,100 records.
                         Where possible, this app corrects or filters them automatically.
                     </p>
 
@@ -340,10 +218,8 @@ export default function Insights() {
                             <div key={i} className={styles.noteCard}>
                                 <div className={styles.noteTop}>
                                     <span className={styles.noteIcon}>{note.icon}</span>
-                                    <span
-                                        className={styles.noteTag}
-                                        style={{ background: note.tagColor, color: note.tagText }}
-                                    >
+                                    <span className={styles.noteTag}
+                                        style={{ background: note.tagColor, color: note.tagText }}>
                                         {note.tag}
                                     </span>
                                 </div>
